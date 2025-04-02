@@ -1,6 +1,57 @@
+<script setup>
+import axios from 'axios';
+import { onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import NoticeModal from '../Notice/NoticeModal.vue';
+import { useModalStore } from '@/stores/modalState';
+import Pagination from '../../../common/Pagination.vue';
+
+const route = useRoute();
+const noticeList = ref();
+const modalState = useModalStore();
+const noticeId = ref();
+const cPage = ref(1);
+
+const searchList = () => {
+    const param = new URLSearchParams({
+        ...route.query,
+        pageSize: 5,
+        currentPage: cPage.value,
+    });
+
+    axios.post('/api/management/noticeListBody.do', param).then
+    (res => {
+        noticeList.value = res.data;
+    });
+}
+
+const handlerModal = (id) => {
+    noticeId.value = id;
+    modalState.setModalState();
+}
+
+const onPostSuccess = () => {
+    modalState.setModalState();
+    searchList();
+}
+
+
+onMounted(() => {
+    searchList();
+    console.log(route.query);
+})
+
+watch(() => route.query, searchList);
+</script>
 <template>
     <div class="divNoticeList">
-        현재 페이지:  총 개수:  
+        <NoticeModal 
+        v-if="modalState.modalState" 
+        :id="noticeId" 
+        @modalClose="() => (noticeId = 0)"
+        @postSuccess="onPostSuccess"
+        "/>
+        현재 페이지:  총 개수: {{ noticeList?.noticeCnt }} 
         <table>
             <colgroup>
                 <col width="10%" />
@@ -18,16 +69,35 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td colspan="7">일치하는 검색 결과가 없습니다</td>
-                </tr>
+                <template v-if="noticeList">
+                    <template v-if="noticeList.noticeCnt > 0">
+                        <tr v-for="notice in noticeList.noticeList" 
+                        :key="notice.noticeId"
+                        @click="handlerModal(notice.noticeId)"
+                        >
+                            <td>{{ notice.noticeId}}</td>
+                            <td>{{ notice.title}}</td>
+                            <td>{{ notice.createdDate.substr(0,10)}}</td>
+                            <td>{{ notice.author}}</td>
+                        </tr>
+                    </template>
+                    <template v-else>
+                        <tr>
+                            <td colspan="7">일치하는 검색 결과가 없습니다</td>
+                        </tr>
+                    </template>
+                </template>
             </tbody>
         </table>
+        <Pagination 
+            :totalItems="noticeList?.noticeCnt" 
+            :items-per-page="5" 
+            :max-pages-shown="5"
+            :onclick="searchList"
+            v-model="cPage"
+        />
     </div>
 </template>
-
-<script setup>
-</script>
 
 <style lang="scss" scoped>
 table {
